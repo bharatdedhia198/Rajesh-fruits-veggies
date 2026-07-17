@@ -496,7 +496,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 32px 20px; }
   .cart-btn { padding: 8px 14px; font-size: 0.88rem; }
 
   /* Hero */
-  .hero { padding: 36px 18px 32px; flex-direction: column; gap: 20px; text-align: center; min-height: unset; }
+  .hero { padding: 0px 18px 24px; flex-direction: column; gap: 12px; text-align: center; min-height: unset; }
   .hero-title { font-size: 1.6rem; }
   .hero-sub { font-size: 0.88rem; }
   .hero-cta { padding: 11px 28px; font-size: 0.92rem; }
@@ -557,7 +557,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 32px 20px; }
 .hero {
   background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 50%, #43a047 100%);
   color: white;
-  padding: 60px 36px;
+  padding: 50px 36px;
   display: flex;
   justify-content: space-between;
   align-items: center;
