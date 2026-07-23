@@ -7,10 +7,17 @@ import Toast from "./components/Toast";
 import Checkout from "./components/Checkout";
 import SkeletonCard from "./components/SkeletonCard";
 import Auth from "./components/Auth";
+import AdminPanel from "./components/AdminPanel";
 import "./App.css";
 
 export default function App() {
   const [user, setUser] = useState(() => localStorage.getItem("rjUser") || null);
+  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem("rjAdmin") === "true");
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [productList, setProductList] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("rjProducts")) || products; }
+    catch { return products; }
+  });
   const [cart, setCart] = useState(() => {
     try { return JSON.parse(localStorage.getItem("rjCart")) || []; }
     catch { return []; }
@@ -25,21 +32,29 @@ export default function App() {
   const [cartShake, setCartShake] = useState(false);
   const shopRef = useRef(null);
 
-  // Persist cart
+  useEffect(() => { localStorage.setItem("rjProducts", JSON.stringify(productList)); }, [productList]);
   useEffect(() => { localStorage.setItem("rjCart", JSON.stringify(cart)); }, [cart]);
-
-  // Simulate loading
   useEffect(() => { const t = setTimeout(() => setLoading(false), 1200); return () => clearTimeout(t); }, []);
-
-  // Scroll to top button
   useEffect(() => {
     const onScroll = () => setShowScrollTop(window.scrollY > 300);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const handleLogin = (name) => { localStorage.setItem("rjUser", name); setUser(name); };
-  const handleLogout = () => { localStorage.removeItem("rjUser"); setUser(null); };
+  const handleLogin = (name, admin = false) => {
+    localStorage.setItem("rjUser", name);
+    localStorage.setItem("rjAdmin", admin);
+    setUser(name);
+    setIsAdmin(admin);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("rjUser");
+    localStorage.removeItem("rjAdmin");
+    setUser(null);
+    setIsAdmin(false);
+    setShowAdminPanel(false);
+  };
 
   const nextQty = (qty) => qty < 0.5 ? 0.5 : qty < 1 ? 1 : qty + 1;
   const prevQty = (qty) => qty <= 0.25 ? null : qty <= 0.5 ? 0.25 : qty <= 1 ? 0.5 : qty - 1;
@@ -65,7 +80,7 @@ export default function App() {
       ? setCart((prev) => prev.filter((i) => i.id !== id))
       : setCart((prev) => prev.map((i) => i.id === id ? { ...i, qty } : i));
 
-  const filtered = products
+  const filtered = productList
     .filter((p) => filter === "all" || p.category === filter)
     .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -81,62 +96,75 @@ export default function App() {
         </div>
         <div className="header-right">
           <span className="header-user">👋 {user}</span>
+          {isAdmin && (
+            <button className="admin-toggle-btn" onClick={() => setShowAdminPanel(s => !s)}>
+              {showAdminPanel ? "🛍️ Shop" : "🛠️ Admin"}
+            </button>
+          )}
           <button className="logout-btn" onClick={handleLogout}>Logout</button>
-          <button className={`cart-btn ${cartShake ? "cart-shake" : ""}`} onClick={() => setShowCart(true)}>
-            🛒 Cart {cartCount > 0 && <span className="badge">{cartCount}</span>}
-          </button>
+          {!showAdminPanel && (
+            <button className={`cart-btn ${cartShake ? "cart-shake" : ""}`} onClick={() => setShowCart(true)}>
+              🛒 Cart {cartCount > 0 && <span className="badge">{cartCount}</span>}
+            </button>
+          )}
         </div>
       </header>
 
-      <Hero onShopNow={() => shopRef.current?.scrollIntoView({ behavior: "smooth" })} />
+      {showAdminPanel ? (
+        <AdminPanel products={productList} onUpdate={setProductList} />
+      ) : (
+        <>
+          <Hero onShopNow={() => shopRef.current?.scrollIntoView({ behavior: "smooth" })} />
 
-      <main ref={shopRef}>
-        <div className="shop-toolbar">
-          <div className="filters">
-            {["all", "fruit", "vegetable"].map((f) => (
-              <button key={f} className={filter === f ? "active" : ""} onClick={() => setFilter(f)}>
-                {f === "all" ? "🛍️ All" : f === "fruit" ? "🍎 Fruits" : "🥦 Vegetables"}
-              </button>
-            ))}
-          </div>
-          <div className="search-wrap">
-            <span className="search-icon">🔍</span>
-            <input
-              className="search-input"
-              placeholder="Search products..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {search && <button className="search-clear" onClick={() => setSearch("")}>✕</button>}
-          </div>
-        </div>
+          <main ref={shopRef}>
+            <div className="shop-toolbar">
+              <div className="filters">
+                {["all", "fruit", "vegetable"].map((f) => (
+                  <button key={f} className={filter === f ? "active" : ""} onClick={() => setFilter(f)}>
+                    {f === "all" ? "🛍️ All" : f === "fruit" ? "🍎 Fruits" : "🥦 Vegetables"}
+                  </button>
+                ))}
+              </div>
+              <div className="search-wrap">
+                <span className="search-icon">🔍</span>
+                <input
+                  className="search-input"
+                  placeholder="Search products..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                {search && <button className="search-clear" onClick={() => setSearch("")}>✕</button>}
+              </div>
+            </div>
 
-        {loading ? (
-          <div className="product-grid">
-            {Array(8).fill(0).map((_, i) => <SkeletonCard key={i} />)}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-emoji">🥲</div>
-            <h3>No products found</h3>
-            <p>Try a different search or category</p>
-            <button className="hero-cta" onClick={() => { setSearch(""); setFilter("all"); }}>Clear Filters</button>
-          </div>
-        ) : (
-          <div className="product-grid">
-            {filtered.map((p, i) => (
-              <ProductCard
-                key={p.id}
-                product={p}
-                onAdd={addToCart}
-                inCart={cart.some((c) => c.id === p.id)}
-                cartQty={cart.find((c) => c.id === p.id)?.qty}
-                animDelay={i * 60}
-              />
-            ))}
-          </div>
-        )}
-      </main>
+            {loading ? (
+              <div className="product-grid">
+                {Array(8).fill(0).map((_, i) => <SkeletonCard key={i} />)}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-emoji">🥲</div>
+                <h3>No products found</h3>
+                <p>Try a different search or category</p>
+                <button className="hero-cta" onClick={() => { setSearch(""); setFilter("all"); }}>Clear Filters</button>
+              </div>
+            ) : (
+              <div className="product-grid">
+                {filtered.map((p, i) => (
+                  <ProductCard
+                    key={p.id}
+                    product={p}
+                    onAdd={addToCart}
+                    inCart={cart.some((c) => c.id === p.id)}
+                    cartQty={cart.find((c) => c.id === p.id)?.qty}
+                    animDelay={i * 60}
+                  />
+                ))}
+              </div>
+            )}
+          </main>
+        </>
+      )}
 
       {showCart && (
         <Cart

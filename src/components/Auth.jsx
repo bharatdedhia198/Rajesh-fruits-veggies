@@ -1,24 +1,62 @@
 import { useState } from "react";
 
+const ADMIN = { name: "Bharat Dedhia", phone: "9152100325", email: "bharatdedhia198@gmail.com" };
+
 export default function Auth({ onLogin }) {
-  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [mode, setMode] = useState("signup"); // "login" | "signup"
+  const [loginWith, setLoginWith] = useState("email"); // "email" | "phone"
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [errors, setErrors] = useState({});
   const [showPass, setShowPass] = useState(false);
 
+  const [showPassStrength, setShowPassStrength] = useState(false);
+
+  const normalizePhone = (p) => p.replace(/^\+91[\s-]?/, "").replace(/[\s-]/g, "");
+
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const phoneRegex = /^[6-9]\d{9}$/;
+
+  const getPasswordStrength = (p) => {
+    if (!p) return null;
+    let score = 0;
+    if (p.length >= 8) score++;
+    if (/[A-Z]/.test(p)) score++;
+    if (/[0-9]/.test(p)) score++;
+    if (/[^A-Za-z0-9]/.test(p)) score++;
+    if (score <= 1) return { label: "Weak", color: "#e53935", width: "25%" };
+    if (score === 2) return { label: "Fair", color: "#fb8c00", width: "50%" };
+    if (score === 3) return { label: "Good", color: "#43a047", width: "75%" };
+    return { label: "Strong", color: "#1b5e20", width: "100%" };
+  };
+
   const validate = () => {
     const e = {};
-    if (mode === "signup" && !form.name.trim()) e.name = "Name is required";
-    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email is required";
-    if (mode === "signup" && !/^\d{10}$/.test(form.phone)) e.phone = "Enter a valid 10-digit number";
-    if (form.password.length < 6) e.password = "Password must be at least 6 characters";
+    if (mode === "signup") {
+      if (!form.name.trim()) e.name = "Full name is required";
+      else if (form.name.trim().length < 3) e.name = "Name must be at least 3 characters";
+      if (!emailRegex.test(form.email)) e.email = "Enter a valid email address";
+      if (!phoneRegex.test(normalizePhone(form.phone))) e.phone = "Enter a valid 10-digit Indian mobile number";
+    }
+    if (mode === "login") {
+      if (loginWith === "email" && !emailRegex.test(form.email)) e.email = "Enter a valid email address";
+      if (loginWith === "phone" && !phoneRegex.test(normalizePhone(form.phone))) e.phone = "Enter a valid 10-digit Indian mobile number";
+    }
+    if (!form.password) e.password = "Password is required";
+    else if (form.password.length < 8) e.password = "Password must be at least 8 characters";
+    else if (!/[A-Z]/.test(form.password)) e.password = "Must contain at least one uppercase letter";
+    else if (!/[0-9]/.test(form.password)) e.password = "Must contain at least one number";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (validate()) onLogin(form.name || form.email.split("@")[0]);
+    if (!validate()) return;
+    const isAdmin =
+      form.email === ADMIN.email ||
+      normalizePhone(form.phone) === ADMIN.phone;
+    const displayName = form.name || (isAdmin ? ADMIN.name : form.email.split("@")[0]);
+    onLogin(displayName, isAdmin);
   };
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
@@ -46,11 +84,11 @@ export default function Auth({ onLogin }) {
       <div className="auth-right">
         <div className="auth-card">
           <div className="auth-tabs">
-            <button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setErrors({}); }}>
-              Login
-            </button>
             <button className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setErrors({}); }}>
               Sign Up
+            </button>
+            <button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setErrors({}); }}>
+              Login
             </button>
           </div>
 
@@ -71,35 +109,79 @@ export default function Auth({ onLogin }) {
               </div>
             )}
 
-            <div className="auth-field">
-              <label>Email Address</label>
-              <div className="auth-input-wrap">
-                <span className="auth-input-icon">✉️</span>
-                <input type="email" placeholder="rajesh@example.com" value={form.email} onChange={set("email")} />
+            {mode === "login" && (
+              <div className="auth-field">
+                <div className="login-with-toggle">
+                  <button type="button" className={loginWith === "email" ? "active" : ""} onClick={() => { setLoginWith("email"); setErrors({}); }}>Email</button>
+                  <button type="button" className={loginWith === "phone" ? "active" : ""} onClick={() => { setLoginWith("phone"); setErrors({}); }}>Phone</button>
+                </div>
+                {loginWith === "email" ? (
+                  <>
+                    <div className="auth-input-wrap">
+                      <span className="auth-input-icon">✉️</span>
+                      <input type="email" placeholder="rajesh@example.com" value={form.email} onChange={set("email")} />
+                    </div>
+                    {errors.email && <span className="auth-error">{errors.email}</span>}
+                  </>
+                ) : (
+                  <>
+                    <div className="auth-input-wrap">
+                      <span className="auth-input-icon">📞</span>
+                      <input type="tel" placeholder="9876543210 or +91 98765 43210" value={form.phone} onChange={set("phone")} />
+                    </div>
+                    {errors.phone && <span className="auth-error">{errors.phone}</span>}
+                  </>
+                )}
               </div>
-              {errors.email && <span className="auth-error">{errors.email}</span>}
-            </div>
+            )}
 
             {mode === "signup" && (
-              <div className="auth-field">
-                <label>Phone Number</label>
-                <div className="auth-input-wrap">
-                  <span className="auth-input-icon">📞</span>
-                  <input type="tel" placeholder="9876543210" maxLength={10} value={form.phone} onChange={set("phone")} />
+              <>
+                <div className="auth-field">
+                  <label>Email Address</label>
+                  <div className="auth-input-wrap">
+                    <span className="auth-input-icon">✉️</span>
+                    <input type="email" placeholder="rajesh@example.com" value={form.email} onChange={set("email")} />
+                  </div>
+                  {errors.email && <span className="auth-error">{errors.email}</span>}
                 </div>
-                {errors.phone && <span className="auth-error">{errors.phone}</span>}
-              </div>
+                <div className="auth-field">
+                  <label>Phone Number</label>
+                  <div className="auth-input-wrap">
+                    <span className="auth-input-icon">📞</span>
+                    <input type="tel" placeholder="9876543210 or +91 98765 43210" value={form.phone} onChange={set("phone")} />
+                  </div>
+                  {errors.phone && <span className="auth-error">{errors.phone}</span>}
+                </div>
+              </>
             )}
 
             <div className="auth-field">
               <label>Password</label>
               <div className="auth-input-wrap">
                 <span className="auth-input-icon">🔒</span>
-                <input type={showPass ? "text" : "password"} placeholder="••••••••" value={form.password} onChange={set("password")} />
+                <input
+                  type={showPass ? "text" : "password"}
+                  placeholder="Min 8 chars, 1 uppercase, 1 number"
+                  value={form.password}
+                  onChange={set("password")}
+                  onFocus={() => setShowPassStrength(true)}
+                />
                 <button type="button" className="auth-eye" onClick={() => setShowPass(s => !s)}>
                   {showPass ? "🙈" : "👁️"}
                 </button>
               </div>
+              {mode === "signup" && form.password && showPassStrength && (() => {
+                const s = getPasswordStrength(form.password);
+                return (
+                  <div className="pass-strength">
+                    <div className="pass-strength-bar">
+                      <div style={{ width: s.width, background: s.color }} />
+                    </div>
+                    <span style={{ color: s.color }}>{s.label}</span>
+                  </div>
+                );
+              })()}
               {errors.password && <span className="auth-error">{errors.password}</span>}
             </div>
 
