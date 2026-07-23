@@ -58,7 +58,7 @@ export default function Auth({ onLogin }) {
     const isAdmin = form.email === ADMIN.email || normalizedPhone === ADMIN.phone;
     const displayName = form.name || (isAdmin ? ADMIN.name : form.email.split("@")[0]);
     if (mode === "signup" && !isAdmin) {
-      registerUser(displayName, form.email, normalizedPhone);
+      registerUser(displayName, form.email, normalizedPhone, form.password);
     }
     onLogin(displayName, isAdmin, { email: form.email, phone: normalizedPhone });
   };

@@ -1950,15 +1950,124 @@ main { max-width: 1200px; margin: 0 auto; padding: 32px 20px; }
 }
 
 .cd-delete-btn {
-  background: none;
+  background: #ff4444;
+  color: #fff;
   border: none;
   cursor: pointer;
-  font-size: 1rem;
-  padding: 2px 4px;
-  border-radius: 4px;
-  opacity: 0.5;
-  transition: opacity 0.2s, background 0.2s;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: background 0.2s;
 }
-.cd-delete-btn:hover { opacity: 1; background: #ffe0e0; }
+.cd-delete-btn:hover { background: #cc0000; }
 
 .input-readonly { background: #f5f5f5; color: #666; cursor: not-allowed; }
+
+/* ── Address Toggle ── */
+.addr-toggle {
+  display: flex;
+  background: #f0f7f0;
+  border-radius: 50px;
+  padding: 4px;
+  gap: 2px;
+}
+.addr-toggle button {
+  flex: 1;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  background: transparent;
+  color: #666;
+  transition: all 0.2s ease;
+}
+.addr-toggle button.active {
+  background: linear-gradient(135deg, #2e7d32, #43a047);
+  color: white;
+  box-shadow: 0 3px 10px rgba(46,125,50,0.3);
+}
+
+/* ── Order Status Badges ── */
+.cd-status-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 50px;
+}
+.status-open       { background: #fff8e1; color: #f57f17; }
+.status-dispatched { background: #e3f2fd; color: #1565c0; }
+.status-cancelled  { background: #ffebee; color: #c62828; }
+
+/* ── Dispatch Button ── */
+.cd-order-actions { margin-top: 8px; }
+.cd-dispatch-btn {
+  background: linear-gradient(135deg, #1565c0, #1976d2);
+  color: white;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 10px rgba(21,101,192,0.3);
+}
+.cd-dispatch-btn:hover { background: linear-gradient(135deg, #0d47a1, #1565c0); transform: translateY(-1px); }
+
+/* ── Cancel Button ── */
+.cd-cancel-btn {
+  background: white;
+  color: #e53935;
+  border: 2px solid #e53935;
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.cd-cancel-btn:hover { background: #e53935; color: white; }
+
+/* ── New Orders Banner ── */
+.cd-new-orders-banner {
+  background: linear-gradient(135deg, #ff6f00, #ffa000);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 14px rgba(255,111,0,0.3);
+  animation: fadeSlideUp 0.4s ease both;
+}
+
+/* ── Open badge on customer card ── */
+.cd-open-badge {
+  background: #fff8e1;
+  color: #f57f17;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 50px;
+  border: 1px solid #ffe082;
+}
+
+/* ── My Orders Button ── */
+.my-orders-btn {
+  background: rgba(255,255,255,0.15);
+  border: 1.5px solid rgba(255,255,255,0.4);
+  color: white;
+  padding: 7px 16px;
+  border-radius: 50px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.my-orders-btn:hover { background: rgba(255,255,255,0.28); }

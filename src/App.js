@@ -9,6 +9,7 @@ import SkeletonCard from "./components/SkeletonCard";
 import Auth from "./components/Auth";
 import AdminPanel from "./components/AdminPanel";
 import CustomerDashboard from "./components/CustomerDashboard";
+import MyOrders from "./components/MyOrders";
 import "./App.css";
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [cartShake, setCartShake] = useState(false);
+  const [showMyOrders, setShowMyOrders] = useState(false);
   const shopRef = useRef(null);
 
   useEffect(() => { localStorage.setItem("rjProducts", JSON.stringify(productList)); }, [productList]);
@@ -112,6 +114,9 @@ export default function App() {
               {showAdminPanel ? "🛍️ Shop" : "🛠️ Admin"}
             </button>
           )}
+          {!isAdmin && (
+            <button className="my-orders-btn" onClick={() => setShowMyOrders(true)}>📦 My Orders</button>
+          )}
           <button className="logout-btn" onClick={handleLogout}>Logout</button>
           {!showAdminPanel && (
             <button className={`cart-btn ${cartShake ? "cart-shake" : ""}`} onClick={() => setShowCart(true)}>
@@ -175,6 +180,10 @@ export default function App() {
             )}
           </main>
         </>
+      )}
+
+      {showMyOrders && (
+        <MyOrders currentUser={userInfo} onClose={() => setShowMyOrders(false)} />
       )}
 
       {showCart && (

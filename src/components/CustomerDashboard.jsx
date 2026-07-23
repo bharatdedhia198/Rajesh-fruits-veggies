@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { getUsers, getOrders, deleteCustomer } from "../data/store";
+import { getUsers, getOrders, deleteCustomer, updateOrderStatus } from "../data/store";
+
+const STATUS_LABEL = { open: "🟡 Open", dispatched: "🚚 Dispatched", cancelled: "❌ Cancelled" };
+const STATUS_CLASS = { open: "status-open", dispatched: "status-dispatched", cancelled: "status-cancelled" };
 
 export default function CustomerDashboard() {
   const [users, setUsers] = useState(getUsers);
@@ -7,13 +10,19 @@ export default function CustomerDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [search, setSearch] = useState("");
 
+  const refresh = () => { setOrders(getOrders()); setUsers(getUsers()); };
+
   const handleDelete = (e, userId) => {
     e.stopPropagation();
     if (!window.confirm("Delete this customer and all their orders? This cannot be undone.")) return;
     deleteCustomer(userId);
-    setUsers(getUsers());
-    setOrders(getOrders());
+    refresh();
     if (selectedUser?.id === userId) setSelectedUser(null);
+  };
+
+  const handleDispatch = (orderId) => {
+    updateOrderStatus(orderId, "dispatched");
+    refresh();
   };
 
   const filtered = users.filter(u =>
@@ -23,18 +32,21 @@ export default function CustomerDashboard() {
   );
 
   const userOrders = (userId) => orders.filter(o => o.customer?.email === users.find(u => u.id === userId)?.email);
-
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
+  const newOrdersCount = orders.filter(o => o.status === "open").length;
+  const totalRevenue = orders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + (o.grandTotal || 0), 0);
 
   const formatDate = (iso) => new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-
-  const formatQty = (qty, unit) => {
-    if (unit !== "kg") return `${qty} ${unit}`;
-    return qty < 1 ? `${qty * 1000}g` : `${qty} kg`;
-  };
+  const formatQty = (qty, unit) => unit !== "kg" ? `${qty} ${unit}` : qty < 1 ? `${qty * 1000}g` : `${qty} kg`;
 
   return (
     <div className="cd-wrap">
+      {/* New orders notification banner */}
+      {newOrdersCount > 0 && (
+        <div className="cd-new-orders-banner">
+          🔔 You have <strong>{newOrdersCount}</strong> new open order{newOrdersCount !== 1 ? "s" : ""} waiting to be dispatched!
+        </div>
+      )}
+
       {/* Stats */}
       <div className="cd-stats">
         <div className="cd-stat"><span className="cd-stat-val">{users.length}</span><span className="cd-stat-label">Total Customers</span></div>
@@ -60,6 +72,7 @@ export default function CustomerDashboard() {
           ) : (
             filtered.map(u => {
               const uOrders = userOrders(u.id);
+              const uOpen = uOrders.filter(o => o.status === "open").length;
               return (
                 <div key={u.id}
                   className={`cd-customer-card ${selectedUser?.id === u.id ? "selected" : ""}`}
@@ -73,8 +86,9 @@ export default function CustomerDashboard() {
                   </div>
                   <div className="cd-customer-meta">
                     <span className="cd-order-count">{uOrders.length} order{uOrders.length !== 1 ? "s" : ""}</span>
-                    <span className="cd-order-total">₹{uOrders.reduce((s, o) => s + (o.grandTotal || 0), 0).toFixed(0)}</span>
-                    <button className="cd-delete-btn" onClick={(e) => handleDelete(e, u.id)} title="Delete customer">🗑️</button>
+                    {uOpen > 0 && <span className="cd-open-badge">{uOpen} open</span>}
+                    <span className="cd-order-total">₹{uOrders.filter(o => o.status !== "cancelled").reduce((s, o) => s + (o.grandTotal || 0), 0).toFixed(0)}</span>
+                    <button className="cd-delete-btn" onClick={(e) => handleDelete(e, u.id)}>Delete Customer</button>
                   </div>
                 </div>
               );
@@ -107,6 +121,9 @@ export default function CustomerDashboard() {
                     <div className="cd-order-top">
                       <span className="cd-order-num">Order #{i + 1}</span>
                       <span className="cd-order-date">{formatDate(order.placedAt)}</span>
+                      <span className={`cd-status-badge ${STATUS_CLASS[order.status] || "status-open"}`}>
+                        {STATUS_LABEL[order.status] || "🟡 Open"}
+                      </span>
                       <span className="cd-order-amount">₹{order.grandTotal?.toFixed(2)}</span>
                     </div>
                     <div className="cd-order-items">
@@ -122,6 +139,13 @@ export default function CustomerDashboard() {
                     <div className="cd-order-delivery">
                       📅 {order.deliveryDate} &nbsp; 🕐 {order.deliveryTime}
                     </div>
+                    {order.status === "open" && (
+                      <div className="cd-order-actions">
+                        <button className="cd-dispatch-btn" onClick={() => handleDispatch(order.id)}>
+                          🚚 Dispatch Order
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
