@@ -8,8 +8,20 @@ const EMOJIS = ["🍎","🍌","🥭","🍇","🍉","🍊","🍅","🥕","🥦","
 function ProductForm({ initial, onSave, onCancel, title }) {
   const [form, setForm] = useState(initial);
   const [errors, setErrors] = useState({});
+  const [preview, setPreview] = useState(initial.image || "");
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setPreview(ev.target.result);
+      setForm(f => ({ ...f, image: ev.target.result }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const validate = () => {
     const e = {};
@@ -81,13 +93,30 @@ function ProductForm({ initial, onSave, onCancel, title }) {
           </div>
 
           <div className="form-group">
-            <label>Image Path <span className="form-hint">(e.g. /images/apple.jfif)</span></label>
-            <input value={form.image} onChange={set("image")} placeholder="/images/apple.jfif" />
+            <label>Product Image</label>
+            <div className="image-upload-wrap">
+              <label className="image-upload-btn">
+                📁 Choose from Device
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={handleImageUpload}
+                />
+              </label>
+              <span className="image-upload-or">or</span>
+              <input
+                className="image-url-input"
+                placeholder="Paste image path e.g. /images/apple.jfif"
+                value={form.image.startsWith("data:") ? "" : form.image}
+                onChange={(e) => { setPreview(e.target.value); set("image")(e); }}
+              />
+            </div>
           </div>
 
-          {form.image && (
+          {preview && (
             <div className="admin-img-preview">
-              <img src={form.image} alt="preview" onError={(e) => e.target.style.display = "none"} />
+              <img src={preview} alt="preview" onError={(e) => e.target.style.display = "none"} />
             </div>
           )}
         </div>

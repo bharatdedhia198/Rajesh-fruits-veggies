@@ -8,11 +8,17 @@ import Checkout from "./components/Checkout";
 import SkeletonCard from "./components/SkeletonCard";
 import Auth from "./components/Auth";
 import AdminPanel from "./components/AdminPanel";
+import CustomerDashboard from "./components/CustomerDashboard";
 import "./App.css";
 
 export default function App() {
   const [user, setUser] = useState(() => localStorage.getItem("rjUser") || null);
+  const [userInfo, setUserInfo] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("rjUserInfo")) || null; }
+    catch { return null; }
+  });
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem("rjAdmin") === "true");
+  const [adminTab, setAdminTab] = useState("products"); // "products" | "customers"
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [productList, setProductList] = useState(() => {
     try { return JSON.parse(localStorage.getItem("rjProducts")) || products; }
@@ -41,18 +47,23 @@ export default function App() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const handleLogin = (name, admin = false) => {
+  const handleLogin = (name, admin = false, info = {}) => {
+    const ui = { name, ...info };
     localStorage.setItem("rjUser", name);
     localStorage.setItem("rjAdmin", admin);
+    localStorage.setItem("rjUserInfo", JSON.stringify(ui));
     setUser(name);
     setIsAdmin(admin);
+    setUserInfo(ui);
   };
 
   const handleLogout = () => {
     localStorage.removeItem("rjUser");
     localStorage.removeItem("rjAdmin");
+    localStorage.removeItem("rjUserInfo");
     setUser(null);
     setIsAdmin(false);
+    setUserInfo(null);
     setShowAdminPanel(false);
   };
 
@@ -111,11 +122,19 @@ export default function App() {
       </header>
 
       {showAdminPanel ? (
-        <AdminPanel products={productList} onUpdate={setProductList} />
+        <div className="admin-wrapper">
+          <div className="admin-nav">
+            <button className={adminTab === "products" ? "active" : ""} onClick={() => setAdminTab("products")}>🛒 Products</button>
+            <button className={adminTab === "customers" ? "active" : ""} onClick={() => setAdminTab("customers")}>👥 Customers</button>
+          </div>
+          {adminTab === "products"
+            ? <AdminPanel products={productList} onUpdate={setProductList} />
+            : <CustomerDashboard />
+          }
+        </div>
       ) : (
         <>
           <Hero onShopNow={() => shopRef.current?.scrollIntoView({ behavior: "smooth" })} />
-
           <main ref={shopRef}>
             <div className="shop-toolbar">
               <div className="filters">
@@ -127,12 +146,8 @@ export default function App() {
               </div>
               <div className="search-wrap">
                 <span className="search-icon">🔍</span>
-                <input
-                  className="search-input"
-                  placeholder="Search products..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+                <input className="search-input" placeholder="Search products..." value={search}
+                  onChange={(e) => setSearch(e.target.value)} />
                 {search && <button className="search-clear" onClick={() => setSearch("")}>✕</button>}
               </div>
             </div>
@@ -151,14 +166,10 @@ export default function App() {
             ) : (
               <div className="product-grid">
                 {filtered.map((p, i) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    onAdd={addToCart}
+                  <ProductCard key={p.id} product={p} onAdd={addToCart}
                     inCart={cart.some((c) => c.id === p.id)}
                     cartQty={cart.find((c) => c.id === p.id)?.qty}
-                    animDelay={i * 60}
-                  />
+                    animDelay={i * 60} />
                 ))}
               </div>
             )}
@@ -167,24 +178,18 @@ export default function App() {
       )}
 
       {showCart && (
-        <Cart
-          items={cart}
-          onRemove={removeFromCart}
-          onClear={clearCart}
+        <Cart items={cart} onRemove={removeFromCart} onClear={clearCart}
           onQtyInc={(id, qty) => updateQty(id, nextQty(qty))}
           onQtyDec={(id, qty) => updateQty(id, prevQty(qty))}
           onClose={() => setShowCart(false)}
-          onCheckout={() => { setShowCart(false); setShowCheckout(true); }}
-        />
+          onCheckout={() => { setShowCart(false); setShowCheckout(true); }} />
       )}
 
       {showCheckout && (
-        <Checkout
-          items={cart}
-          total={cartTotal}
+        <Checkout items={cart} total={cartTotal}
+          currentUser={userInfo}
           onClose={() => setShowCheckout(false)}
-          onConfirm={clearCart}
-        />
+          onConfirm={clearCart} />
       )}
 
       <div className="toast-container">
@@ -194,9 +199,7 @@ export default function App() {
       </div>
 
       {showScrollTop && (
-        <button className="scroll-top-btn" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-          ↑
-        </button>
+        <button className="scroll-top-btn" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>↑</button>
       )}
     </div>
   );

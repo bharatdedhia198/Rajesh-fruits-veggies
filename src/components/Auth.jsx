@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { registerUser } from "../data/store";
+
 const ADMIN = { name: "Bharat Dedhia", phone: "9152100325", email: "bharatdedhia198@gmail.com" };
 
 export default function Auth({ onLogin }) {
@@ -52,11 +54,13 @@ export default function Auth({ onLogin }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validate()) return;
-    const isAdmin =
-      form.email === ADMIN.email ||
-      normalizePhone(form.phone) === ADMIN.phone;
+    const normalizedPhone = normalizePhone(form.phone);
+    const isAdmin = form.email === ADMIN.email || normalizedPhone === ADMIN.phone;
     const displayName = form.name || (isAdmin ? ADMIN.name : form.email.split("@")[0]);
-    onLogin(displayName, isAdmin);
+    if (mode === "signup" && !isAdmin) {
+      registerUser(displayName, form.email, normalizedPhone);
+    }
+    onLogin(displayName, isAdmin, { email: form.email, phone: normalizedPhone });
   };
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));

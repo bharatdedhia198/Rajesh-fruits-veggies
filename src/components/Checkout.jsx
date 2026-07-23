@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { saveOrder } from "../data/store";
 
-export default function Checkout({ items, total, onClose, onConfirm }) {
+export default function Checkout({ items, total, onClose, onConfirm, currentUser }) {
   const [step, setStep] = useState("form"); // "form" | "confirmed"
-  const [form, setForm] = useState({ name: "", phone: "", room: "", building: "", landmark: "", area: "", city: "", date: "", time: "" });
+  const [form, setForm] = useState({ name: currentUser?.name || "", phone: currentUser?.phone || "", room: "", building: "", landmark: "", area: "", city: "", date: "", time: "" });
   const [errors, setErrors] = useState({});
 
   const validate = () => {
@@ -21,7 +22,19 @@ export default function Checkout({ items, total, onClose, onConfirm }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (validate()) setStep("confirmed");
+    if (!validate()) return;
+    saveOrder({
+      customer: currentUser,
+      items: items.map(i => ({ id: i.id, name: i.name, emoji: i.emoji, qty: i.qty, unit: i.unit, price: i.price })),
+      subtotal: total,
+      delivery: 20,
+      grandTotal: total + 20,
+      address: { room: form.room, building: form.building, landmark: form.landmark, area: form.area, city: form.city },
+      phone: form.phone,
+      deliveryDate: form.date,
+      deliveryTime: form.time,
+    });
+    setStep("confirmed");
   };
 
   if (step === "confirmed") {
@@ -75,15 +88,11 @@ export default function Checkout({ items, total, onClose, onConfirm }) {
         <form className="checkout-form" onSubmit={handleSubmit} noValidate>
           <div className="form-group">
             <label>Full Name</label>
-            <input placeholder="Rajesh Thorat" value={form.name}
-              onChange={e => setForm(f => ({...f, name: e.target.value}))} />
-            {errors.name && <span className="form-error">{errors.name}</span>}
+            <input value={form.name} readOnly className="input-readonly" />
           </div>
           <div className="form-group">
             <label>Phone Number</label>
-            <input placeholder="9876543210" value={form.phone} maxLength={10}
-              onChange={e => setForm(f => ({...f, phone: e.target.value}))} />
-            {errors.phone && <span className="form-error">{errors.phone}</span>}
+            <input value={form.phone} readOnly className="input-readonly" />
           </div>
           <div className="form-group">
             <label>Room / Flat No</label>
