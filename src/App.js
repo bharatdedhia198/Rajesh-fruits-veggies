@@ -6,9 +6,11 @@ import Hero from "./components/Hero";
 import Toast from "./components/Toast";
 import Checkout from "./components/Checkout";
 import SkeletonCard from "./components/SkeletonCard";
+import Auth from "./components/Auth";
 import "./App.css";
 
 export default function App() {
+  const [user, setUser] = useState(() => localStorage.getItem("rjUser") || null);
   const [cart, setCart] = useState(() => {
     try { return JSON.parse(localStorage.getItem("rjCart")) || []; }
     catch { return []; }
@@ -36,8 +38,13 @@ export default function App() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const handleLogin = (name) => { localStorage.setItem("rjUser", name); setUser(name); };
+  const handleLogout = () => { localStorage.removeItem("rjUser"); setUser(null); };
+
   const nextQty = (qty) => qty < 0.5 ? 0.5 : qty < 1 ? 1 : qty + 1;
   const prevQty = (qty) => qty <= 0.25 ? null : qty <= 0.5 ? 0.25 : qty <= 1 ? 0.5 : qty - 1;
+
+  if (!user) return <Auth onLogin={handleLogin} />;
 
   const addToCart = (product) => {
     setCart((prev) => {
@@ -72,9 +79,13 @@ export default function App() {
           <span className="logo">🌿 Rajesh Fruits &amp; Vegetables</span>
           <p className="tagline">Fresh from the farm to your door</p>
         </div>
-        <button className={`cart-btn ${cartShake ? "cart-shake" : ""}`} onClick={() => setShowCart(true)}>
-          🛒 Cart {cartCount > 0 && <span className="badge">{cartCount}</span>}
-        </button>
+        <div className="header-right">
+          <span className="header-user">👋 {user}</span>
+          <button className="logout-btn" onClick={handleLogout}>Logout</button>
+          <button className={`cart-btn ${cartShake ? "cart-shake" : ""}`} onClick={() => setShowCart(true)}>
+            🛒 Cart {cartCount > 0 && <span className="badge">{cartCount}</span>}
+          </button>
+        </div>
       </header>
 
       <Hero onShopNow={() => shopRef.current?.scrollIntoView({ behavior: "smooth" })} />
