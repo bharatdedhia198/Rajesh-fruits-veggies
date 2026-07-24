@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { saveOrder, getSavedAddresses, addOrUpdateAddress } from "../data/store";
 
-const EMPTY_ADDR = { room: "", building: "", landmark: "", area: "", city: "" };
+const EMPTY_ADDR = { room: "", building: "", landmark: "", area: "", city: "", pincode: "" };
 const formatAddrLine = (a) => `${a.room}, ${a.building}${a.landmark ? `, Near ${a.landmark}` : ""}, ${a.area}, ${a.city}`;
 const formatQty = (qty, unit) => unit !== "kg" ? `${qty} ${unit}` : qty < 1 ? `${qty * 1000}g` : `${qty} kg`;
 
@@ -32,14 +32,21 @@ function AddrFields({ form, setForm, errors }) {
         <input placeholder="e.g. Mumbai" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
         {errors?.city && <span className="form-error">{errors.city}</span>}
       </div>
+      <div className="form-group">
+        <label>Pincode</label>
+        <input placeholder="e.g. 400053" value={form.pincode} maxLength={6}
+          onChange={e => { if (/^\d{0,6}$/.test(e.target.value)) setForm(f => ({ ...f, pincode: e.target.value })); }} />
+        {errors?.pincode && <span className="form-error">{errors.pincode}</span>}
+      </div>
     </>
   );
 }
 
 export default function Checkout({ items, total, onClose, onConfirm, currentUser }) {
   const email = currentUser?.email;
+  const phone = currentUser?.phone;
 
-  const [savedAddresses, setSavedAddresses] = useState(() => email ? getSavedAddresses(email) : []);
+  const [savedAddresses, setSavedAddresses] = useState(() => getSavedAddresses(email, phone));
   const [selectedIdx, setSelectedIdx] = useState(savedAddresses.length > 0 ? 0 : "new");
   const [editIdx, setEditIdx] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_ADDR);
@@ -61,6 +68,8 @@ export default function Checkout({ items, total, onClose, onConfirm, currentUser
     if (!a?.building?.trim()) e.building = "Building name is required";
     if (!a?.area?.trim()) e.area = "Area is required";
     if (!a?.city?.trim()) e.city = "City is required";
+    if (!a?.pincode?.trim()) e.pincode = "Pincode is required";
+    else if (!/^\d{6}$/.test(a.pincode)) e.pincode = "Enter a valid 6-digit pincode";
     if (!date) e.date = "Please select a delivery date";
     if (!time) e.time = "Please select a time slot";
     setErrors(e);
@@ -73,9 +82,11 @@ export default function Checkout({ items, total, onClose, onConfirm, currentUser
     if (!newForm.building.trim()) e.building = "Required";
     if (!newForm.area.trim()) e.area = "Required";
     if (!newForm.city.trim()) e.city = "Required";
+    if (!newForm.pincode.trim()) e.pincode = "Required";
+    else if (!/^\d{6}$/.test(newForm.pincode)) e.pincode = "6-digit pincode required";
     if (Object.keys(e).length) { setAddrErrors(e); return; }
-    addOrUpdateAddress(email, { ...newForm });
-    const updated = getSavedAddresses(email);
+    addOrUpdateAddress(email, phone, { ...newForm });
+    const updated = getSavedAddresses(email, phone);
     setSavedAddresses(updated);
     setSelectedIdx(updated.length - 1);
     setNewForm(EMPTY_ADDR);
@@ -88,9 +99,11 @@ export default function Checkout({ items, total, onClose, onConfirm, currentUser
     if (!editForm.building.trim()) e.building = "Required";
     if (!editForm.area.trim()) e.area = "Required";
     if (!editForm.city.trim()) e.city = "Required";
+    if (!editForm.pincode.trim()) e.pincode = "Required";
+    else if (!/^\d{6}$/.test(editForm.pincode)) e.pincode = "6-digit pincode required";
     if (Object.keys(e).length) { setAddrErrors(e); return; }
-    addOrUpdateAddress(email, { ...editForm }, idx);
-    const updated = getSavedAddresses(email);
+    addOrUpdateAddress(email, phone, { ...editForm }, idx);
+    const updated = getSavedAddresses(email, phone);
     setSavedAddresses(updated);
     setEditIdx(null);
     setAddrErrors({});
@@ -125,7 +138,7 @@ export default function Checkout({ items, total, onClose, onConfirm, currentUser
       `*Total: Rs.${(total + 20).toFixed(2)}*`,
       "",
       "*Delivery Address:*",
-      `${finalAddr.room}, ${finalAddr.building}${landmark}, ${finalAddr.area}, ${finalAddr.city}`,
+      `${finalAddr.room}, ${finalAddr.building}${landmark}, ${finalAddr.area}, ${finalAddr.city} - ${finalAddr.pincode}`,
       "",
       `Date: ${date}`,
       `Time: ${time}`,

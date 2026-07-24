@@ -30,25 +30,27 @@ export const deleteCustomer = (userId) => {
   saveOrders(getOrders().filter(o => o.customer?.email !== user.email));
 };
 
-export const getSavedAddresses = (email) => {
-  try {
-    const all = JSON.parse(localStorage.getItem("rjAddresses")) || {};
-    return all[email] || [];
-  }
+// Use phone as primary key, email as fallback — whichever is non-empty
+const addrKey = (email, phone) => {
+  const key = (phone && phone.trim()) ? phone.trim() : (email && email.trim()) ? email.trim() : null;
+  if (!key) return null;
+  return `rjAddr_${key}`;
+};
+
+export const getSavedAddresses = (email, phone) => {
+  const key = addrKey(email, phone);
+  if (!key) return [];
+  try { return JSON.parse(localStorage.getItem(key)) || []; }
   catch { return []; }
 };
 
-export const saveAddresses = (email, addresses) => {
-  const all = (() => { try { return JSON.parse(localStorage.getItem("rjAddresses")) || {}; } catch { return {}; } })();
-  all[email] = addresses;
-  localStorage.setItem("rjAddresses", JSON.stringify(all));
-};
-
-export const addOrUpdateAddress = (email, address, index = null) => {
-  const list = getSavedAddresses(email);
+export const addOrUpdateAddress = (email, phone, address, index = null) => {
+  const key = addrKey(email, phone);
+  if (!key) return;
+  const list = getSavedAddresses(email, phone);
   if (index !== null) list[index] = address;
   else list.push(address);
-  saveAddresses(email, list);
+  localStorage.setItem(key, JSON.stringify(list));
 };
 
 export const saveOrder = (order) => {

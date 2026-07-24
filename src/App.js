@@ -195,7 +195,7 @@ export default function App() {
       )}
 
       {showCheckout && (
-        <Checkout items={cart} total={cartTotal}
+        <Checkout key={Date.now()} items={cart} total={cartTotal}
           currentUser={userInfo}
           onClose={() => setShowCheckout(false)}
           onConfirm={clearCart} />

@@ -127,7 +127,13 @@ export default function Auth({ onLogin }) {
     if (mode === "signup" && !isAdmin) {
       registerUser(displayName, form.email, normalizedPhone, form.password);
     }
-    onLogin(displayName, isAdmin, { email: form.email, phone: normalizedPhone });
+    const users = getUsers();
+    const stored = !isAdmin
+      ? (loginWith === "email" ? users.find(u => u.email === form.email) : users.find(u => u.phone === normalizedPhone))
+      : null;
+    const resolvedEmail = stored?.email || form.email;
+    const resolvedPhone = stored?.phone || normalizedPhone;
+    onLogin(displayName, isAdmin, { email: resolvedEmail, phone: resolvedPhone });
   };
 
   const resendOtp = () => {
