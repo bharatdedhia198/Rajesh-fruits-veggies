@@ -1,20 +1,36 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { registerUser, getUsers } from "../data/store";
 
-import { registerUser } from "../data/store";
-
-const ADMIN = { name: "Bharat Dedhia", phone: "9152100325", email: "bharatdedhia198@gmail.com" };
+const ADMIN = { name: "Bharat Dedhia", phone: "9152100325", email: "bharatdedhia198@gmail.com", password: "Bharat_2026" };
 
 export default function Auth({ onLogin }) {
-  const [mode, setMode] = useState("signup"); // "login" | "signup"
-  const [loginWith, setLoginWith] = useState("email"); // "email" | "phone"
+  const [mode, setMode] = useState("signup");
+  const [loginWith, setLoginWith] = useState("email");
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [errors, setErrors] = useState({});
   const [showPass, setShowPass] = useState(false);
-
   const [showPassStrength, setShowPassStrength] = useState(false);
 
-  const normalizePhone = (p) => p.replace(/^\+91[\s-]?/, "").replace(/[\s-]/g, "");
+  // OTP state
+  const [otpStep, setOtpStep] = useState(false);
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [otpInput, setOtpInput] = useState(["", "", "", "", "", ""]);
+  const [otpError, setOtpError] = useState("");
+  const [resendTimer, setResendTimer] = useState(30);
+  const otpRefs = useRef([]);
+  const timerRef = useRef(null);
 
+  useEffect(() => {
+    if (otpStep) {
+      setResendTimer(30);
+      timerRef.current = setInterval(() => {
+        setResendTimer(t => { if (t <= 1) { clearInterval(timerRef.current); return 0; } return t - 1; });
+      }, 1000);
+      return () => clearInterval(timerRef.current);
+    }
+  }, [otpStep]);
+
+  const normalizePhone = (p) => p.replace(/^\+91[\s-]?/, "").replace(/[\s-]/g, "");
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   const phoneRegex = /^[6-9]\d{9}$/;
 
@@ -51,20 +67,159 @@ export default function Auth({ onLogin }) {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const sendOtp = () => {
     if (!validate()) return;
+
+    // For login: verify user exists and password matches
+    if (mode === "login") {
+      const normalizedPhone = normalizePhone(form.phone);
+      const isAdmin = form.email === ADMIN.email || normalizedPhone === ADMIN.phone;
+      if (!isAdmin) {
+        const users = getUsers();
+        const user = loginWith === "email"
+          ? users.find(u => u.email === form.email)
+          : users.find(u => u.phone === normalizedPhone);
+        if (!user) { setErrors({ general: "No account found. Please sign up first." }); return; }
+        if (user.password !== form.password) { setErrors({ password: "Incorrect password." }); return; }
+      } else {
+        if (form.password !== ADMIN.password) { setErrors({ password: "Incorrect password." }); return; }
+      }
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    setGeneratedOtp(otp);
+    setOtpInput(["", "", "", "", "", ""]);
+    setOtpError("");
+    setOtpStep(true);
+    setTimeout(() => otpRefs.current[0]?.focus(), 100);
+  };
+
+  const handleOtpChange = (val, idx) => {
+    if (!/^\d?$/.test(val)) return;
+    const next = [...otpInput];
+    next[idx] = val;
+    setOtpInput(next);
+    setOtpError("");
+    if (val && idx < 5) otpRefs.current[idx + 1]?.focus();
+  };
+
+  const handleOtpKeyDown = (e, idx) => {
+    if (e.key === "Backspace" && !otpInput[idx] && idx > 0) otpRefs.current[idx - 1]?.focus();
+  };
+
+  const handleOtpPaste = (e) => {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (pasted.length === 6) {
+      setOtpInput(pasted.split(""));
+      otpRefs.current[5]?.focus();
+    }
+  };
+
+  const verifyOtp = () => {
+    const entered = otpInput.join("");
+    if (entered.length < 6) { setOtpError("Please enter the complete 6-digit OTP."); return; }
+    if (entered !== generatedOtp) { setOtpError("Incorrect OTP. Please try again."); return; }
+
     const normalizedPhone = normalizePhone(form.phone);
     const isAdmin = form.email === ADMIN.email || normalizedPhone === ADMIN.phone;
     const displayName = form.name || (isAdmin ? ADMIN.name : form.email.split("@")[0]);
+
     if (mode === "signup" && !isAdmin) {
       registerUser(displayName, form.email, normalizedPhone, form.password);
     }
     onLogin(displayName, isAdmin, { email: form.email, phone: normalizedPhone });
   };
 
+  const resendOtp = () => {
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    setGeneratedOtp(otp);
+    setOtpInput(["", "", "", "", "", ""]);
+    setOtpError("");
+    setResendTimer(30);
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setResendTimer(t => { if (t <= 1) { clearInterval(timerRef.current); return 0; } return t - 1; });
+    }, 1000);
+    setTimeout(() => otpRefs.current[0]?.focus(), 100);
+  };
+
+  const contactDisplay = mode === "login"
+    ? (loginWith === "email" ? form.email : `+91 ${normalizePhone(form.phone)}`)
+    : `+91 ${normalizePhone(form.phone)}`;
+
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
 
+  // ── OTP Screen ──
+  if (otpStep) {
+    return (
+      <div className="auth-page">
+        <div className="auth-left">
+          <div className="auth-brand">
+            <span className="auth-logo">🌿</span>
+            <h1>Rajesh Fruits<br />&amp; Vegetables</h1>
+            <p>Fresh from the farm to your door. Order online, get it delivered fresh every day.</p>
+          </div>
+          <div className="auth-floats">
+            <span className="af af1">🍎</span><span className="af af2">🥭</span>
+            <span className="af af3">🍇</span><span className="af af4">🥕</span>
+            <span className="af af5">🍅</span><span className="af af6">🍌</span>
+            <span className="af af7">🥦</span><span className="af af8">🍊</span>
+          </div>
+        </div>
+
+        <div className="auth-right">
+          <div className="auth-card">
+            <div className="otp-header">
+              <div className="otp-icon">📱</div>
+              <h2>Verify OTP</h2>
+              <p>A 6-digit OTP has been sent to<br /><strong>{contactDisplay}</strong></p>
+            </div>
+
+            {/* Mock OTP display */}
+            <div className="otp-mock-box">
+              <span>🔐 Your OTP (demo):</span>
+              <strong className="otp-mock-code">{generatedOtp}</strong>
+            </div>
+
+            <div className="otp-inputs" onPaste={handleOtpPaste}>
+              {otpInput.map((val, idx) => (
+                <input
+                  key={idx}
+                  ref={el => otpRefs.current[idx] = el}
+                  className={`otp-box ${val ? "filled" : ""}`}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={val}
+                  onChange={e => handleOtpChange(e.target.value, idx)}
+                  onKeyDown={e => handleOtpKeyDown(e, idx)}
+                />
+              ))}
+            </div>
+
+            {otpError && <span className="auth-error" style={{ textAlign: "center", display: "block", marginTop: "8px" }}>{otpError}</span>}
+
+            <button className="auth-submit" style={{ marginTop: "20px" }} onClick={verifyOtp}>
+              Verify & {mode === "login" ? "Login" : "Create Account"} →
+            </button>
+
+            <div className="otp-resend">
+              {resendTimer > 0
+                ? <span>Resend OTP in <strong>{resendTimer}s</strong></span>
+                : <button className="otp-resend-btn" onClick={resendOtp}>Resend OTP</button>
+              }
+            </div>
+
+            <button className="otp-back-btn" onClick={() => { setOtpStep(false); setOtpError(""); }}>
+              ← Change details
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main Form ──
   return (
     <div className="auth-page">
       <div className="auth-left">
@@ -74,26 +229,18 @@ export default function Auth({ onLogin }) {
           <p>Fresh from the farm to your door. Order online, get it delivered fresh every day.</p>
         </div>
         <div className="auth-floats">
-          <span className="af af1">🍎</span>
-          <span className="af af2">🥭</span>
-          <span className="af af3">🍇</span>
-          <span className="af af4">🥕</span>
-          <span className="af af5">🍅</span>
-          <span className="af af6">🍌</span>
-          <span className="af af7">🥦</span>
-          <span className="af af8">🍊</span>
+          <span className="af af1">🍎</span><span className="af af2">🥭</span>
+          <span className="af af3">🍇</span><span className="af af4">🥕</span>
+          <span className="af af5">🍅</span><span className="af af6">🍌</span>
+          <span className="af af7">🥦</span><span className="af af8">🍊</span>
         </div>
       </div>
 
       <div className="auth-right">
         <div className="auth-card">
           <div className="auth-tabs">
-            <button className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setErrors({}); }}>
-              Sign Up
-            </button>
-            <button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setErrors({}); }}>
-              Login
-            </button>
+            <button className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setErrors({}); setOtpStep(false); }}>Sign Up</button>
+            <button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setErrors({}); setOtpStep(false); }}>Login</button>
           </div>
 
           <div className="auth-welcome">
@@ -101,13 +248,15 @@ export default function Auth({ onLogin }) {
             <p>{mode === "login" ? "Login to continue shopping fresh produce" : "Join us for fresh fruits & vegetables"}</p>
           </div>
 
-          <form onSubmit={handleSubmit} noValidate>
+          {errors.general && <div className="auth-error-banner">{errors.general}</div>}
+
+          <form onSubmit={(e) => { e.preventDefault(); sendOtp(); }} noValidate>
             {mode === "signup" && (
               <div className="auth-field">
                 <label>Full Name</label>
                 <div className="auth-input-wrap">
                   <span className="auth-input-icon">👤</span>
-                  <input type="text" placeholder="Rajesh Thorat" value={form.name} onChange={set("name")} />
+                  <input type="text" placeholder="Akshay Kumar" value={form.name} onChange={set("name")} />
                 </div>
                 {errors.name && <span className="auth-error">{errors.name}</span>}
               </div>
@@ -123,7 +272,7 @@ export default function Auth({ onLogin }) {
                   <>
                     <div className="auth-input-wrap">
                       <span className="auth-input-icon">✉️</span>
-                      <input type="email" placeholder="rajesh@example.com" value={form.email} onChange={set("email")} />
+                      <input type="email" placeholder="akshay@example.com" value={form.email} onChange={set("email")} />
                     </div>
                     {errors.email && <span className="auth-error">{errors.email}</span>}
                   </>
@@ -145,7 +294,7 @@ export default function Auth({ onLogin }) {
                   <label>Email Address</label>
                   <div className="auth-input-wrap">
                     <span className="auth-input-icon">✉️</span>
-                    <input type="email" placeholder="rajesh@example.com" value={form.email} onChange={set("email")} />
+                    <input type="email" placeholder="akshay@example.com" value={form.email} onChange={set("email")} />
                   </div>
                   {errors.email && <span className="auth-error">{errors.email}</span>}
                 </div>
@@ -179,9 +328,7 @@ export default function Auth({ onLogin }) {
                 const s = getPasswordStrength(form.password);
                 return (
                   <div className="pass-strength">
-                    <div className="pass-strength-bar">
-                      <div style={{ width: s.width, background: s.color }} />
-                    </div>
+                    <div className="pass-strength-bar"><div style={{ width: s.width, background: s.color }} /></div>
                     <span style={{ color: s.color }}>{s.label}</span>
                   </div>
                 );
@@ -189,22 +336,13 @@ export default function Auth({ onLogin }) {
               {errors.password && <span className="auth-error">{errors.password}</span>}
             </div>
 
-            {mode === "login" && (
-              <div className="auth-forgot">
-                <span>Forgot password?</span>
-              </div>
-            )}
-
             <button type="submit" className="auth-submit">
-              {mode === "login" ? "Login →" : "Create Account →"}
+              {mode === "login" ? "Send OTP & Login →" : "Send OTP & Sign Up →"}
             </button>
           </form>
 
           <div className="auth-divider"><span>or continue as</span></div>
-
-          <button className="auth-guest" onClick={() => onLogin("Guest")}>
-            🛍️ Browse as Guest
-          </button>
+          <button className="auth-guest" onClick={() => onLogin("Guest")}>🛍️ Browse as Guest</button>
         </div>
       </div>
     </div>

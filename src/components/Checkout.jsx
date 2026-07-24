@@ -1,63 +1,146 @@
 import { useState } from "react";
-import { saveOrder, getSavedAddresses, saveAddress } from "../data/store";
+import { saveOrder, getSavedAddresses, addOrUpdateAddress } from "../data/store";
 
 const EMPTY_ADDR = { room: "", building: "", landmark: "", area: "", city: "" };
+const formatAddrLine = (a) => `${a.room}, ${a.building}${a.landmark ? `, Near ${a.landmark}` : ""}, ${a.area}, ${a.city}`;
+const formatQty = (qty, unit) => unit !== "kg" ? `${qty} ${unit}` : qty < 1 ? `${qty * 1000}g` : `${qty} kg`;
+
+function AddrFields({ form, setForm, errors }) {
+  return (
+    <>
+      <div className="form-group">
+        <label>Room / Flat No</label>
+        <input placeholder="e.g. 304" value={form.room} onChange={e => setForm(f => ({ ...f, room: e.target.value }))} />
+        {errors?.room && <span className="form-error">{errors.room}</span>}
+      </div>
+      <div className="form-group">
+        <label>Building Name</label>
+        <input placeholder="e.g. Sunshine Apartments" value={form.building} onChange={e => setForm(f => ({ ...f, building: e.target.value }))} />
+        {errors?.building && <span className="form-error">{errors.building}</span>}
+      </div>
+      <div className="form-group">
+        <label>Landmark <span style={{ color: "#aaa", fontWeight: 400 }}>(optional)</span></label>
+        <input placeholder="e.g. Near City Mall" value={form.landmark} onChange={e => setForm(f => ({ ...f, landmark: e.target.value }))} />
+      </div>
+      <div className="form-group">
+        <label>Area</label>
+        <input placeholder="e.g. Andheri West" value={form.area} onChange={e => setForm(f => ({ ...f, area: e.target.value }))} />
+        {errors?.area && <span className="form-error">{errors.area}</span>}
+      </div>
+      <div className="form-group">
+        <label>City</label>
+        <input placeholder="e.g. Mumbai" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
+        {errors?.city && <span className="form-error">{errors.city}</span>}
+      </div>
+    </>
+  );
+}
 
 export default function Checkout({ items, total, onClose, onConfirm, currentUser }) {
   const email = currentUser?.email;
-  const savedAddr = email ? (getSavedAddresses()[email] || null) : null;
 
-  const [step, setStep] = useState("form");
-  const [useNew, setUseNew] = useState(!savedAddr);
-  const [addrForm, setAddrForm] = useState(savedAddr || EMPTY_ADDR);
-  const [newAddrForm, setNewAddrForm] = useState(EMPTY_ADDR);
+  const [savedAddresses, setSavedAddresses] = useState(() => email ? getSavedAddresses(email) : []);
+  const [selectedIdx, setSelectedIdx] = useState(savedAddresses.length > 0 ? 0 : "new");
+  const [editIdx, setEditIdx] = useState(null);
+  const [editForm, setEditForm] = useState(EMPTY_ADDR);
+  const [newForm, setNewForm] = useState(EMPTY_ADDR);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [errors, setErrors] = useState({});
+  const [addrErrors, setAddrErrors] = useState({});
+  const [step, setStep] = useState("form");
 
-  const activeAddr = useNew ? newAddrForm : addrForm;
-  const setActiveAddr = useNew
-    ? (fn) => setNewAddrForm(f => typeof fn === "function" ? fn(f) : fn)
-    : (fn) => setAddrForm(f => typeof fn === "function" ? fn(f) : fn);
+  const activeAddr = selectedIdx === "new"
+    ? newForm
+    : (editIdx !== null ? editForm : (savedAddresses[selectedIdx] || EMPTY_ADDR));
 
   const validate = () => {
     const e = {};
-    if (!activeAddr.room.trim()) e.room = "Room / Flat No is required";
-    if (!activeAddr.building.trim()) e.building = "Building name is required";
-    if (!activeAddr.area.trim()) e.area = "Area is required";
-    if (!activeAddr.city.trim()) e.city = "City is required";
+    const a = activeAddr;
+    if (!a?.room?.trim()) e.room = "Room / Flat No is required";
+    if (!a?.building?.trim()) e.building = "Building name is required";
+    if (!a?.area?.trim()) e.area = "Area is required";
+    if (!a?.city?.trim()) e.city = "City is required";
     if (!date) e.date = "Please select a delivery date";
     if (!time) e.time = "Please select a time slot";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const ADMIN_PHONE = "919152100325"; // WhatsApp needs country code
+  const handleSaveNew = () => {
+    const e = {};
+    if (!newForm.room.trim()) e.room = "Required";
+    if (!newForm.building.trim()) e.building = "Required";
+    if (!newForm.area.trim()) e.area = "Required";
+    if (!newForm.city.trim()) e.city = "Required";
+    if (Object.keys(e).length) { setAddrErrors(e); return; }
+    addOrUpdateAddress(email, { ...newForm });
+    const updated = getSavedAddresses(email);
+    setSavedAddresses(updated);
+    setSelectedIdx(updated.length - 1);
+    setNewForm(EMPTY_ADDR);
+    setAddrErrors({});
+  };
+
+  const handleSaveEdit = (idx) => {
+    const e = {};
+    if (!editForm.room.trim()) e.room = "Required";
+    if (!editForm.building.trim()) e.building = "Required";
+    if (!editForm.area.trim()) e.area = "Required";
+    if (!editForm.city.trim()) e.city = "Required";
+    if (Object.keys(e).length) { setAddrErrors(e); return; }
+    addOrUpdateAddress(email, { ...editForm }, idx);
+    const updated = getSavedAddresses(email);
+    setSavedAddresses(updated);
+    setEditIdx(null);
+    setAddrErrors({});
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validate()) return;
-    if (email) saveAddress(email, activeAddr);
+
+    const finalAddr = activeAddr;
     saveOrder({
       customer: currentUser,
       items: items.map(i => ({ id: i.id, name: i.name, emoji: i.emoji, qty: i.qty, unit: i.unit, price: i.price })),
-      subtotal: total,
-      delivery: 20,
-      grandTotal: total + 20,
-      address: activeAddr,
-      deliveryDate: date,
-      deliveryTime: time,
+      subtotal: total, delivery: 20, grandTotal: total + 20,
+      address: finalAddr, deliveryDate: date, deliveryTime: time,
     });
-    // Notify admin via WhatsApp
-    const itemList = items.map(i => `${i.emoji}${i.name}`).join(", ");
-    const msg = encodeURIComponent(`🛒 New Order!\nCustomer: ${currentUser?.name} (${currentUser?.phone})\nItems: ${itemList}\nTotal: ₹${(total + 20).toFixed(2)}\nDelivery: ${date}, ${time}\nAddress: ${activeAddr.room}, ${activeAddr.building}, ${activeAddr.area}, ${activeAddr.city}`);
-    window.open(`https://wa.me/${ADMIN_PHONE}?text=${msg}`, "_blank");
+
+    // WhatsApp — text only, no emojis
+    const ADMIN_PHONE = "919152100325";
+    const itemList = items.map(i => `  - ${i.name} | ${formatQty(i.qty, i.unit)} | Rs.${(i.price * i.qty).toFixed(2)}`).join("\n");
+    const landmark = finalAddr.landmark ? `, Near ${finalAddr.landmark}` : "";
+    const msg = [
+      "*New Order Received!*",
+      `Customer: ${currentUser?.name}`,
+      `Phone: ${currentUser?.phone}`,
+      "",
+      "*Items:*",
+      itemList,
+      "",
+      `Subtotal: Rs.${total.toFixed(2)}`,
+      `Delivery: Rs.20.00`,
+      `*Total: Rs.${(total + 20).toFixed(2)}*`,
+      "",
+      "*Delivery Address:*",
+      `${finalAddr.room}, ${finalAddr.building}${landmark}, ${finalAddr.area}, ${finalAddr.city}`,
+      "",
+      `Date: ${date}`,
+      `Time: ${time}`,
+    ].join("\n");
+    window.open(`https://wa.me/${ADMIN_PHONE}?text=${encodeURIComponent(msg)}`, "_blank");
     setStep("confirmed");
   };
 
-  const field = (key) => (
-    <input value={activeAddr[key]} onChange={e => setActiveAddr(f => ({ ...f, [key]: e.target.value }))} />
-  );
+  const startEdit = (e, idx) => {
+    e.stopPropagation();
+    setEditIdx(idx);
+    setEditForm({ ...savedAddresses[idx] });
+    setSelectedIdx(idx);
+    setErrors({});
+  };
 
   if (step === "confirmed") {
     return (
@@ -65,10 +148,10 @@ export default function Checkout({ items, total, onClose, onConfirm, currentUser
         <div className="checkout-panel confirmed-panel">
           <div className="confirmed-icon">🎉</div>
           <h2>Order Placed!</h2>
-          <p>Thank you, <strong>{currentUser?.name}</strong>! Your order of <strong>₹{(total + 20).toFixed(2)}</strong> (incl. ₹20 delivery) will be delivered to:</p>
-          <div className="confirmed-address">{activeAddr.room}, {activeAddr.building}{activeAddr.landmark ? `, Near ${activeAddr.landmark}` : ""}, {activeAddr.area}, {activeAddr.city}</div>
-          <p className="confirmed-phone">📞 {currentUser?.phone}</p>
-          <p className="confirmed-phone">📅 {date} &nbsp; 🕐 {time}</p>
+          <p>Thank you, <strong>{currentUser?.name}</strong>! Your order of <strong>Rs.{(total + 20).toFixed(2)}</strong> (incl. Rs.20 delivery) will be delivered to:</p>
+          <div className="confirmed-address">{formatAddrLine(activeAddr)}</div>
+          <p className="confirmed-phone">Phone: {currentUser?.phone}</p>
+          <p className="confirmed-phone">Date: {date} &nbsp; Time: {time}</p>
           <div className="confirmed-items">
             {items.map(i => <span key={i.id} className="confirmed-item">{i.emoji} {i.name}</span>)}
           </div>
@@ -91,7 +174,7 @@ export default function Checkout({ items, total, onClose, onConfirm, currentUser
         <div className="checkout-summary">
           {items.map(i => (
             <div key={i.id} className="checkout-summary-item">
-              <span>{i.emoji} {i.name} ({i.unit === "kg" ? (i.qty < 1 ? `${i.qty * 1000}g` : `${i.qty} kg`) : `${i.qty} ${i.unit}`})</span>
+              <span>{i.emoji} {i.name} ({formatQty(i.qty, i.unit)})</span>
               <span>₹{(i.price * i.qty).toFixed(2)}</span>
             </div>
           ))}
@@ -109,42 +192,50 @@ export default function Checkout({ items, total, onClose, onConfirm, currentUser
             <input value={currentUser?.phone || ""} readOnly className="input-readonly" />
           </div>
 
-          {/* Address section */}
-          {savedAddr && (
-            <div className="addr-toggle">
-              <button type="button" className={!useNew ? "active" : ""} onClick={() => { setUseNew(false); setErrors({}); }}>
-                📍 Saved Address
-              </button>
-              <button type="button" className={useNew ? "active" : ""} onClick={() => { setUseNew(true); setErrors({}); }}>
-                ➕ New Address
-              </button>
-            </div>
-          )}
+          <div className="addr-section-label">📍 Delivery Address</div>
 
-          <div className="form-group">
-            <label>Room / Flat No</label>
-            {field("room")}
-            {errors.room && <span className="form-error">{errors.room}</span>}
-          </div>
-          <div className="form-group">
-            <label>Building Name</label>
-            {field("building")}
-            {errors.building && <span className="form-error">{errors.building}</span>}
-          </div>
-          <div className="form-group">
-            <label>Landmark</label>
-            <input value={activeAddr.landmark} placeholder="e.g. Near City Mall"
-              onChange={e => setActiveAddr(f => ({ ...f, landmark: e.target.value }))} />
-          </div>
-          <div className="form-group">
-            <label>Area</label>
-            {field("area")}
-            {errors.area && <span className="form-error">{errors.area}</span>}
-          </div>
-          <div className="form-group">
-            <label>City</label>
-            {field("city")}
-            {errors.city && <span className="form-error">{errors.city}</span>}
+          {/* Saved address cards */}
+          {savedAddresses.map((addr, idx) => (
+            <div key={idx} className={`addr-card ${selectedIdx === idx && editIdx === null ? "addr-card-selected" : ""}`}>
+              <div className="addr-card-top" onClick={() => { setSelectedIdx(idx); setEditIdx(null); setErrors({}); }}>
+                <div className="addr-card-radio">
+                  <div className={`addr-radio-dot ${selectedIdx === idx && editIdx === null ? "active" : ""}`} />
+                </div>
+                <div className="addr-card-text">
+                  <strong>Address {idx + 1} — {addr.room}, {addr.building}</strong>
+                  <span>{addr.landmark ? `Near ${addr.landmark}, ` : ""}{addr.area}, {addr.city}</span>
+                </div>
+                <button type="button" className="addr-edit-btn" onClick={(e) => startEdit(e, idx)}>Edit</button>
+              </div>
+
+              {editIdx === idx && (
+                <div className="addr-edit-form" onClick={e => e.stopPropagation()}>
+                  <AddrFields form={editForm} setForm={setEditForm} errors={addrErrors} />
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <button type="button" className="addr-save-btn" onClick={() => handleSaveEdit(idx)}>Save Address</button>
+                    <button type="button" className="addr-cancel-edit-btn" onClick={() => { setEditIdx(null); setAddrErrors({}); }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          <div className={`addr-card ${selectedIdx === "new" ? "addr-card-selected" : ""}`}
+            onClick={() => { setSelectedIdx("new"); setEditIdx(null); setAddrErrors({}); }}>
+            <div className="addr-card-top">
+              <div className="addr-card-radio">
+                <div className={`addr-radio-dot ${selectedIdx === "new" ? "active" : ""}`} />
+              </div>
+              <div className="addr-card-text">
+                <strong>+ Add {savedAddresses.length > 0 ? `Address ${savedAddresses.length + 1}` : "New Address"}</strong>
+              </div>
+            </div>
+            {selectedIdx === "new" && (
+              <div className="addr-edit-form" onClick={e => e.stopPropagation()}>
+                <AddrFields form={newForm} setForm={setNewForm} errors={addrErrors} />
+                <button type="button" className="addr-save-btn" onClick={handleSaveNew}>Save Address</button>
+              </div>
+            )}
           </div>
 
           <div className="form-group">

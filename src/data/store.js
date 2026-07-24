@@ -31,14 +31,24 @@ export const deleteCustomer = (userId) => {
 };
 
 export const getSavedAddresses = (email) => {
-  try { return JSON.parse(localStorage.getItem("rjAddresses")) || {}; }
-  catch { return {}; }
+  try {
+    const all = JSON.parse(localStorage.getItem("rjAddresses")) || {};
+    return all[email] || [];
+  }
+  catch { return []; }
 };
 
-export const saveAddress = (email, address) => {
-  const all = getSavedAddresses();
-  all[email] = address;
+export const saveAddresses = (email, addresses) => {
+  const all = (() => { try { return JSON.parse(localStorage.getItem("rjAddresses")) || {}; } catch { return {}; } })();
+  all[email] = addresses;
   localStorage.setItem("rjAddresses", JSON.stringify(all));
+};
+
+export const addOrUpdateAddress = (email, address, index = null) => {
+  const list = getSavedAddresses(email);
+  if (index !== null) list[index] = address;
+  else list.push(address);
+  saveAddresses(email, list);
 };
 
 export const saveOrder = (order) => {
